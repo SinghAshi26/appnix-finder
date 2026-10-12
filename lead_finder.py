@@ -2,6 +2,7 @@
 Appnix Local Lead Finder
 ------------------------
 Extracts local business listings via Google Places API (New) and saves them to CSV.
+Tracks Places API call volumes in usage.json with in-memory fallback for read-only environments.
 
 Setup:
     pip install requests
@@ -15,14 +16,18 @@ Usage:
 
 import argparse
 import csv
+import datetime
+import json
 import os
 import sys
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
 URL = "https://places.googleapis.com/v1/places:searchText"
+USAGE_FILE = "usage.json"
+_IN_MEMORY_USAGE: Dict[str, int] = {}
 
 # Contact, website, and rating fields fall under Google Places Enterprise SKU
 FIELDS = ",".join(
@@ -57,6 +62,54 @@ SOCIAL_HOSTS = (
 )
 
 
+def _current_month_key() -> str:
+    """Return the current month formatted as YYYY-MM."""
+    return datetime.date.today().strftime("%Y-%m")
+
+
+def get_monthly_usage(month: Optional[str] = None) -> Tuple[int, bool]:
+    """
+    Get the number of Google Places API calls made for the given month.
+    Returns (calls_count, is_persistent_storage).
+    """
+    m_key = month or _current_month_key()
+    if os.path.exists(USAGE_FILE):
+        try:
+            with open(USAGE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return int(data.get(m_key, 0)), True
+        except Exception:
+            pass
+
+    # Fallback to in-memory store
+    return int(_IN_MEMORY_USAGE.get(m_key, 0)), False
+
+
+def record_api_call(count: int = 1, month: Optional[str] = None) -> Tuple[int, bool]:
+    """
+    Increment monthly API call counter and persist to usage.json if writable.
+    Returns (new_count, is_persistent).
+    """
+    m_key = month or _current_month_key()
+    current_calls, is_file = get_monthly_usage(m_key)
+    new_count = current_calls + count
+
+    # Try saving to usage.json
+    try:
+        data: Dict[str, Any] = {}
+        if os.path.exists(USAGE_FILE):
+            with open(USAGE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        data[m_key] = new_count
+        with open(USAGE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        return new_count, True
+    except Exception:
+        # File write failed (read-only filesystem or permissions)
+        _IN_MEMORY_USAGE[m_key] = new_count
+        return new_count, False
+
+
 def lead_type(website: str) -> str:
     """Classify lead priority based on website presence."""
     if not website:
@@ -66,8 +119,16 @@ def lead_type(website: str) -> str:
     return "Check website"
 
 
-def search(query: str, api_key: str, max_pages: int) -> List[Dict[str, Any]]:
-    """Search Google Places API for businesses matching the query."""
+def search(
+    query: str,
+    api_key: str,
+    max_pages: int,
+    usage_limit: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Search Google Places API for businesses matching the query.
+    Respects optional monthly usage limits and records all calls.
+    """
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": api_key,
@@ -77,7 +138,17 @@ def search(query: str, api_key: str, max_pages: int) -> List[Dict[str, Any]]:
     results: List[Dict[str, Any]] = []
 
     for _ in range(max_pages):
+        current_used, _ = get_monthly_usage()
+        if usage_limit is not None and current_used >= usage_limit:
+            print(
+                f"Places API monthly call threshold reached ({current_used} >= {usage_limit}). Stopping further searches.",
+                file=sys.stderr,
+            )
+            break
+
         r = requests.post(URL, json=body, headers=headers, timeout=30)
+        record_api_call(1)
+
         if r.status_code != 200:
             print(f"Places API error ({r.status_code}): {r.text[:400]}", file=sys.stderr)
             break
@@ -162,6 +233,9 @@ def main() -> None:
     print(f"Saved {new_count} new leads to {args.out}.")
     hot = sum(1 for p in places if lead_type(p.get("websiteUri", "")).startswith("HOT"))
     print(f"{hot} leads classified as 'HOT' (no website or social-only link).")
+    calls, persistent = get_monthly_usage()
+    storage_type = "file" if persistent else "in-memory"
+    print(f"Total Places API calls used this month: {calls} ({storage_type}).")
 
 
 if __name__ == "__main__":

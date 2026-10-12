@@ -101,6 +101,18 @@ CUSTOM_CSS = """
         font-weight: 500;
         transition: all 0.15s ease-in-out;
     }
+
+    /* Badges */
+    .score-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .score-high { background-color: #dcfce7; color: #166534; }
+    .score-mid { background-color: #fef9c3; color: #854d0e; }
+    .score-low { background-color: #fee2e2; color: #991b1b; }
 </style>
 """
 
@@ -110,7 +122,10 @@ def apply_custom_css() -> None:
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
-def render_header(title: str = "Appnix Lead Finder", subtitle: str = "Find local businesses, audit websites, find emails, and send personalized WhatsApp outreach.") -> None:
+def render_header(
+    title: str = "Appnix Lead Finder",
+    subtitle: str = "Find local businesses, audit websites, find emails, and perform personalized manual outreach.",
+) -> None:
     """Render a clean, professional application header."""
     st.markdown(
         f"""

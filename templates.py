@@ -1,10 +1,12 @@
 """
-Outreach templates and benefit mapping for WhatsApp communication.
-Provides templates in English and Hinglish with language-aware category benefits.
+Outreach templates and benefit mapping for WhatsApp and Email communication.
+Provides templates in English and Hinglish with language-aware category benefits
+and graceful degradation for missing metrics.
 """
 
-from typing import Dict
+from typing import Any, Dict, Optional, Tuple
 
+# WhatsApp Templates
 TEMPLATES: Dict[str, Dict[str, str]] = {
     "English": {
         "No website": (
@@ -77,6 +79,185 @@ TEMPLATES: Dict[str, Dict[str, str]] = {
     },
 }
 
+# Email Templates (Plain-text, 80-120 words, soft question, opt-out line, Appnix Technologies signature)
+EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
+    "English": {
+        "No website": {
+            "subject": "Quick question regarding {name}'s online presence",
+            "body": (
+                "Hi {name} team,\n\n"
+                "My name is {sender}. I recently came across {name} on Google Maps while researching local businesses "
+                "in your area, and noticed you don't have an active website listed.\n\n"
+                "Today, most potential customers search online before visiting or calling. When they can't find an "
+                "official website, they often turn to nearby competitors.\n\n"
+                "We build modern, fast-loading websites specifically designed for local businesses, complete with "
+                "direct WhatsApp inquiries and mobile booking.\n\n"
+                "Would you be open to a quick 2-minute preview of what a website could look like for {name}?\n\n"
+                "If this isn't relevant, just let me know and I won't write again.\n\n"
+                "Best regards,\n"
+                "{sender}\n"
+                "Appnix Technologies\n"
+                "https://appnix.org"
+            ),
+        },
+        "Website audit findings": {
+            "subject": "Quick technical observation regarding {site}",
+            "body": (
+                "Hi {name} team,\n\n"
+                "My name is {sender}. I was looking at your website ({site}) and noticed an issue that might be "
+                "affecting your visitors: {problem}.{psi_line}\n\n"
+                "Since over 70% of local customers browse on mobile devices today, technical issues like this "
+                "often lead to visitors dropping off before contacting you.\n\n"
+                "We help local businesses resolve these specific UX and performance issues quickly without having "
+                "to rebuild the entire website from scratch.\n\n"
+                "Would you be open to a free, detailed audit report showing exactly how to fix this?\n\n"
+                "If this isn't relevant, just let me know and I won't write again.\n\n"
+                "Best regards,\n"
+                "{sender}\n"
+                "Appnix Technologies\n"
+                "https://appnix.org"
+            ),
+        },
+        "WhatsApp API": {
+            "subject": "Automated WhatsApp inquiries for {name}",
+            "body": (
+                "Hi {name} team,\n\n"
+                "My name is {sender}. I'm reaching out because we help local businesses automate customer "
+                "communication on WhatsApp directly from their official phone numbers.\n\n"
+                "For businesses like {name}, this handles {benefit} automatically, 24/7, without requiring staff to "
+                "reply manually to repetitive questions.\n\n"
+                "This ensures every customer inquiry gets answered in seconds, helping you capture leads who would "
+                "otherwise contact competitors.\n\n"
+                "Could I share a 2-minute demo link showing how it functions? Absolutely no pressure if this isn't "
+                "a priority right now.\n\n"
+                "If this isn't relevant, just let me know and I won't write again.\n\n"
+                "Best regards,\n"
+                "{sender}\n"
+                "Appnix Technologies\n"
+                "https://appnix.org"
+            ),
+        },
+        "Follow-up (after 3 days)": {
+            "subject": "Re: Checking in regarding {name}",
+            "body": (
+                "Hi {name} team,\n\n"
+                "I wanted to follow up briefly on my note from earlier this week. I know you're likely busy managing "
+                "day-to-day operations.\n\n"
+                "I just wanted to check if improving your online presence or streamlining customer inquiries is "
+                "something you're considering this quarter.\n\n"
+                "If you have 5 minutes sometime this week, I'd be glad to share some quick ideas tailored for {name}.\n\n"
+                "If this isn't relevant, just let me know and I won't write again.\n\n"
+                "Best regards,\n"
+                "{sender}\n"
+                "Appnix Technologies\n"
+                "https://appnix.org"
+            ),
+        },
+        "Final nudge (after 7 days)": {
+            "subject": "Closing the loop on {name}",
+            "body": (
+                "Hi {name} team,\n\n"
+                "One final note from my side to close the loop. I haven't heard back, so I assume this isn't the right "
+                "time, and I promise not to follow up further.\n\n"
+                "If you ever decide down the road to revamp your website, fix performance issues, or automate customer "
+                "inquiries, feel free to keep my details handy and reach out anytime.\n\n"
+                "Wishing {name} continued success.\n\n"
+                "If this isn't relevant, just let me know and I won't write again.\n\n"
+                "Best regards,\n"
+                "{sender}\n"
+                "Appnix Technologies\n"
+                "https://appnix.org"
+            ),
+        },
+    },
+    "Hinglish": {
+        "No website": {
+            "subject": "{name} ke online presence ke regarding ek quick question",
+            "body": (
+                "Namaste {name} team,\n\n"
+                "Main {sender} baat kar raha hu. Maine recently Google Maps par {name} dekha aur notice kiya ki "
+                "aapki koi official website listed nahi hai.\n\n"
+                "Aaj kal zyadatar customers call ya visit karne se pehle online check karte hain. Website na milne "
+                "par kaafi customers dusre local alternatives par chale jaate hain.\n\n"
+                "Hum local businesses ke liye modern, fast websites create karte hain jisme direct WhatsApp chat aur "
+                "enquiry buttons integrated hote hain.\n\n"
+                "Kya main {name} ke liye ek sample preview share kar sakta hu? Dekhne mein sirf 2 minute lagenge.\n\n"
+                "Agar yeh relevant nahi hai, toh bas bata dijiye aur main dobara contact nahi karunga.\n\n"
+                "Best regards,\n"
+                "{sender}\n"
+                "Appnix Technologies\n"
+                "https://appnix.org"
+            ),
+        },
+        "Website audit findings": {
+            "subject": "{site} ke baare mein ek zaroori observation",
+            "body": (
+                "Namaste {name} team,\n\n"
+                "Main {sender} baat kar raha hu. Maine aapki website ({site}) visit ki aur ek technical issue "
+                "notice kiya: {problem}.{psi_line}\n\n"
+                "Aaj kal 70% se zyada customers mobile phones se websites browse karte hain, isliye aisi problems ki "
+                "wajah se enquiries miss ho jaati hain.\n\n"
+                "Hum bina poori website dobara banaye in specific technical issues ko fast resolve karte hain.\n\n"
+                "Kya main aapke saath ek free, detailed audit report share karun jisme step-by-step solution likha ho?\n\n"
+                "Agar yeh relevant nahi hai, toh bas bata dijiye aur main dobara contact nahi karunga.\n\n"
+                "Best regards,\n"
+                "{sender}\n"
+                "Appnix Technologies\n"
+                "https://appnix.org"
+            ),
+        },
+        "WhatsApp API": {
+            "subject": "{name} ke liye automated WhatsApp customer inquiry system",
+            "body": (
+                "Namaste {name} team,\n\n"
+                "Main {sender} baat kar raha hu. Hum local businesses ke liye official WhatsApp Business automation "
+                "setup karte hain jisse customer communication seamless ho jaaye.\n\n"
+                "{name} ke liye yeh {benefit} automatically manage kar deta hai, bina kisi staff ke manual reply ke.\n\n"
+                "Isse har customer inquiry ka turant reply milta hai aur response time fast hone se conversions "
+                "improve hote hain.\n\n"
+                "Kya main ek 2-minute ka quick demo video share karun? Agar pasand na aaye toh koi issue nahi hai.\n\n"
+                "Agar yeh relevant nahi hai, toh bas bata dijiye aur main dobara contact nahi karunga.\n\n"
+                "Best regards,\n"
+                "{sender}\n"
+                "Appnix Technologies\n"
+                "https://appnix.org"
+            ),
+        },
+        "Follow-up (after 3 days)": {
+            "subject": "Re: {name} ke regarding quick follow-up",
+            "body": (
+                "Namaste {name} team,\n\n"
+                "Pichle message ke regarding quick follow-up kar raha tha. Main samajh sakta hu aap business operations "
+                "mein busy honge.\n\n"
+                "Bas ek baar confirm karna chahta tha ki kya website upgrade ya customer communication improve karna "
+                "aapki priority list mein hai.\n\n"
+                "Agar aapke paas 5 minute ka time ho, toh main {name} ke liye tailored practical ideas share kar sakta hu.\n\n"
+                "Agar yeh relevant nahi hai, toh bas bata dijiye aur main dobara contact nahi karunga.\n\n"
+                "Best regards,\n"
+                "{sender}\n"
+                "Appnix Technologies\n"
+                "https://appnix.org"
+            ),
+        },
+        "Final nudge (after 7 days)": {
+            "subject": "{name} ke regarding final update",
+            "body": (
+                "Namaste {name} team,\n\n"
+                "Meri taraf se yeh aakhri message hai. Reply na aane par main assume kar raha hu ki abhi yeh aapke liye "
+                "right time nahi hai, isliye main aage follow-up nahi karunga.\n\n"
+                "Agar future mein kabhi website revamp, speed optimization ya WhatsApp automation par help chahiye ho, "
+                "toh aap bejhijhak mujhe contact kar sakte hain.\n\n"
+                "{name} ki growth ke liye best wishes.\n\n"
+                "Agar yeh relevant nahi hai, toh bas bata dijiye aur main dobara contact nahi karunga.\n\n"
+                "Best regards,\n"
+                "{sender}\n"
+                "Appnix Technologies\n"
+                "https://appnix.org"
+            ),
+        },
+    },
+}
+
 
 def api_benefit(category: str, language: str = "English") -> str:
     """Return tailored business automation benefits in English or Hinglish."""
@@ -128,7 +309,7 @@ def format_message(
     problem: str = "",
     benefit: str = "",
 ) -> str:
-    """Format outreach template string safely without missing key errors."""
+    """Format WhatsApp outreach template string safely without missing key errors."""
     clean_name = (name or "there").strip()
     clean_sender = (sender or "Appnix Technologies").strip()
     clean_problem = (problem or "").strip()
@@ -140,3 +321,60 @@ def format_message(
         problem=clean_problem,
         benefit=clean_benefit,
     )
+
+
+def format_email(
+    language: str,
+    template_name: str,
+    name: str,
+    sender: str,
+    site: str = "",
+    problem: str = "",
+    benefit: str = "",
+    psi_score: Any = "",
+) -> Tuple[str, str]:
+    """
+    Format subject and body for an email template.
+    Degrades gracefully when metrics like psi_score or site are absent.
+    """
+    lang_key = "Hinglish" if language.lower() == "hinglish" else "English"
+    templates_for_lang = EMAIL_TEMPLATES.get(lang_key, EMAIL_TEMPLATES["English"])
+    tpl_entry = templates_for_lang.get(template_name, templates_for_lang["No website"])
+
+    raw_subject = tpl_entry["subject"]
+    raw_body = tpl_entry["body"]
+
+    clean_name = (name or "there").strip()
+    clean_sender = (sender or "Jitendra, Appnix Technologies").strip()
+    clean_site = (site or "your website").strip()
+    clean_problem = (problem or "").strip()
+    clean_benefit = (benefit or "").strip()
+
+    # Graceful degradation for psi_score
+    psi_str = str(psi_score).strip() if psi_score is not None else ""
+    if psi_str and psi_str.isdigit():
+        if lang_key == "Hinglish":
+            psi_line = f"\nSaath hi, Google mobile speed score abhi {psi_str}/100 show kar raha hai."
+        else:
+            psi_line = f"\nAdditionally, Google's mobile performance score is currently {psi_str}/100."
+    else:
+        psi_line = ""
+
+    formatted_subject = raw_subject.format(
+        name=clean_name,
+        sender=clean_sender,
+        site=clean_site,
+        problem=clean_problem,
+        benefit=clean_benefit,
+    )
+
+    formatted_body = raw_body.format(
+        name=clean_name,
+        sender=clean_sender,
+        site=clean_site,
+        problem=clean_problem,
+        benefit=clean_benefit,
+        psi_line=psi_line,
+    )
+
+    return formatted_subject, formatted_body
