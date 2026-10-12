@@ -1,19 +1,16 @@
 """
 Appnix Local Lead Finder
 ------------------------
-Google Places API (New) se local businesses ki list nikalta hai aur CSV banata hai.
+Extracts local business listings via Google Places API (New) and saves them to CSV.
 
 Setup:
     pip install requests
-    export GOOGLE_API_KEY=""        (Windows: set GOOGLE_API_KEY=your_key)
+    export GOOGLE_API_KEY="your_api_key"    (Windows: set GOOGLE_API_KEY=your_api_key)
 
-Use:
+Usage:
     python lead_finder.py "coaching center" "Lucknow"
     python lead_finder.py "clinic" "Noida Sector 62" --out clinics.csv
     python lead_finder.py "restaurant" "Lucknow Gomti Nagar" --max-pages 3
-
-Tip: ek query se max ~60 results milte hain. Zyada leads ke liye area badal badal ke
-chalao (Gomti Nagar, Aliganj, Indira Nagar, Hazratganj...).
 """
 
 import argparse
@@ -21,12 +18,13 @@ import csv
 import os
 import sys
 import time
+from typing import Any, Dict, List
 
 import requests
 
 URL = "https://places.googleapis.com/v1/places:searchText"
 
-# Phone/website/rating wale fields "Enterprise" SKU me aate hain (1,000 free searches/month).
+# Contact, website, and rating fields fall under Google Places Enterprise SKU
 FIELDS = ",".join(
     [
         "places.id",
@@ -42,35 +40,46 @@ FIELDS = ",".join(
     ]
 )
 
-# In links ko "asli website" nahi maante: ye log website ke bina hi ginte hain
+# Domains considered social media or directories rather than official websites
 SOCIAL_HOSTS = (
-    "facebook.com", "instagram.com", "justdial.com", "linktr.ee",
-    "wa.me", "whatsapp.com", "youtube.com", "twitter.com", "x.com",
-    "sulekha.com", "indiamart.com", "business.site",  # business.site = purani Google free site
+    "facebook.com",
+    "instagram.com",
+    "justdial.com",
+    "linktr.ee",
+    "wa.me",
+    "whatsapp.com",
+    "youtube.com",
+    "twitter.com",
+    "x.com",
+    "sulekha.com",
+    "indiamart.com",
+    "business.site",  # Legacy Google business mini-sites
 )
 
 
 def lead_type(website: str) -> str:
+    """Classify lead priority based on website presence."""
     if not website:
         return "HOT - no website"
     if any(h in website.lower() for h in SOCIAL_HOSTS):
         return "HOT - only social/directory page"
-    return "check website (run website_audit.py)"
+    return "Check website"
 
 
-def search(query: str, api_key: str, max_pages: int):
+def search(query: str, api_key: str, max_pages: int) -> List[Dict[str, Any]]:
+    """Search Google Places API for businesses matching the query."""
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": api_key,
         "X-Goog-FieldMask": FIELDS,
     }
-    body = {"textQuery": query, "pageSize": 20, "regionCode": "IN"}
-    results = []
+    body: Dict[str, Any] = {"textQuery": query, "pageSize": 20, "regionCode": "IN"}
+    results: List[Dict[str, Any]] = []
 
-    for page in range(max_pages):
+    for _ in range(max_pages):
         r = requests.post(URL, json=body, headers=headers, timeout=30)
         if r.status_code != 200:
-            print(f"API error {r.status_code}: {r.text[:400]}", file=sys.stderr)
+            print(f"Places API error ({r.status_code}): {r.text[:400]}", file=sys.stderr)
             break
         data = r.json()
         results.extend(data.get("places", []))
@@ -78,38 +87,48 @@ def search(query: str, api_key: str, max_pages: int):
         if not token:
             break
         body["pageToken"] = token
-        time.sleep(2)  # token activate hone me thoda time lagta hai
+        time.sleep(2)  # Wait for Google token propagation
     return results
 
 
-def main():
-    ap = argparse.ArgumentParser(description="Google Maps se local leads nikalo")
-    ap.add_argument("category", help='jaise "coaching center", "clinic", "restaurant"')
-    ap.add_argument("city", help='jaise "Lucknow" ya "Noida Sector 62"')
-    ap.add_argument("--max-pages", type=int, default=3, help="1-3 (har page 20 results)")
-    ap.add_argument("--out", default="leads.csv", help="output CSV file")
+def main() -> None:
+    """CLI entry point for searching leads and writing to CSV."""
+    ap = argparse.ArgumentParser(description="Find local business leads via Google Maps Places API")
+    ap.add_argument("category", help='Business type, e.g., "coaching center", "clinic", "restaurant"')
+    ap.add_argument("city", help='City or neighborhood, e.g., "Lucknow" or "Noida Sector 62"')
+    ap.add_argument("--max-pages", type=int, default=3, help="Pages to fetch (1-3, each page has up to 20 results)")
+    ap.add_argument("--out", default="leads.csv", help="Output CSV filepath")
     args = ap.parse_args()
 
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        sys.exit("GOOGLE_API_KEY set nahi hai. README / chat wale steps follow karo.")
+        sys.exit("Error: GOOGLE_API_KEY environment variable is not set. Please configure your key.")
 
     query = f"{args.category} in {args.city}"
     print(f"Searching: {query}")
     places = search(query, api_key, min(args.max_pages, 3))
-    print(f"{len(places)} businesses mile")
+    print(f"Found {len(places)} businesses.")
 
-    # Purani file me jo leads hain unhe dobara mat likho
     seen = set()
     file_exists = os.path.exists(args.out)
     if file_exists:
         with open(args.out, newline="", encoding="utf-8") as f:
-            seen = {row["place_id"] for row in csv.DictReader(f)}
+            seen = {row.get("place_id", "") for row in csv.DictReader(f)}
 
     cols = [
-        "place_id", "name", "category_searched", "city_searched", "phone",
-        "website", "lead_type", "rating", "reviews", "address", "maps_link",
-        "email", "status",
+        "place_id",
+        "name",
+        "category_searched",
+        "city_searched",
+        "phone",
+        "website",
+        "lead_type",
+        "rating",
+        "reviews",
+        "address",
+        "maps_link",
+        "email",
+        "status",
     ]
     new_count = 0
     with open(args.out, "a", newline="", encoding="utf-8") as f:
@@ -140,9 +159,9 @@ def main():
             )
             new_count += 1
 
-    print(f"{new_count} nayi leads {args.out} me save hui")
+    print(f"Saved {new_count} new leads to {args.out}.")
     hot = sum(1 for p in places if lead_type(p.get("websiteUri", "")).startswith("HOT"))
-    print(f"Inme se {hot} 'HOT' hain (website nahi / sirf social page)")
+    print(f"{hot} leads classified as 'HOT' (no website or social-only link).")
 
 
 if __name__ == "__main__":
