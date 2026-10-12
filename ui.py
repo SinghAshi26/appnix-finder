@@ -10,6 +10,7 @@ CUSTOM_CSS = """
     /* Hide Streamlit default hamburger menu and footer only */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    [class*="viewerBadge"] {visibility: hidden; display: none !important;}
 
     /* Main container spacing */
     .block-container {

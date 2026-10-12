@@ -184,7 +184,7 @@ with st.sidebar:
     usage_pct = min(1.0, used_calls / free_limit)
 
     st.subheader("Places API Usage")
-    st.progress(usage_pct, text=f"Calls this month: {used_calls} / {free_limit} free")
+    st.progress(usage_pct, text=f"Calls this month: {used_calls} / {free_limit} safe tier")
     if used_calls >= 800:
         st.warning("⚠️ Warning: You have used over 80% of your free 1,000 monthly Places API calls.")
 
