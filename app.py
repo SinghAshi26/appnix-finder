@@ -60,7 +60,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Apply custom styling
+# Apply custom styling (only hides #MainMenu and footer, keeps sidebar controls visible)
 apply_custom_css()
 
 
@@ -90,15 +90,89 @@ if APP_PASSWORD:
                     st.error("Incorrect password. Please try again.")
         st.stop()
 
-# Initialize session state
+# Initialize session state for lead data and audit cache
 if "leads" not in st.session_state:
     st.session_state.leads = pd.DataFrame(columns=CSV_COLUMNS)
 
 if "audit_cache" not in st.session_state:
     st.session_state.audit_cache = {}
 
+# Initialize Sender details in session state
 if "sender_name" not in st.session_state:
-    st.session_state["sender_name"] = "Jitendra, Appnix Technologies"
+    st.session_state["sender_name"] = "Jitendra"
+if "company_name" not in st.session_state:
+    st.session_state["company_name"] = "Appnix Technologies"
+if "website_url" not in st.session_state:
+    st.session_state["website_url"] = "appnix.org"
+
+# Initialize mirror keys for tab expanders to prevent widget ID collisions
+for pfx in ("wa_exp", "email_exp"):
+    if f"{pfx}_sender_name" not in st.session_state:
+        st.session_state[f"{pfx}_sender_name"] = st.session_state["sender_name"]
+    if f"{pfx}_company_name" not in st.session_state:
+        st.session_state[f"{pfx}_company_name"] = st.session_state["company_name"]
+    if f"{pfx}_website_url" not in st.session_state:
+        st.session_state[f"{pfx}_website_url"] = st.session_state["website_url"]
+
+
+# Callbacks for seamless two-way synchronization between sidebar and tab expanders
+def on_sidebar_sender_change():
+    for pfx in ("wa_exp", "email_exp"):
+        st.session_state[f"{pfx}_sender_name"] = st.session_state["sender_name"]
+        st.session_state[f"{pfx}_company_name"] = st.session_state["company_name"]
+        st.session_state[f"{pfx}_website_url"] = st.session_state["website_url"]
+
+
+def on_expander_sender_change(source_prefix: str):
+    st.session_state["sender_name"] = st.session_state[f"{source_prefix}_sender_name"]
+    st.session_state["company_name"] = st.session_state[f"{source_prefix}_company_name"]
+    st.session_state["website_url"] = st.session_state[f"{source_prefix}_website_url"]
+    other_prefix = "email_exp" if source_prefix == "wa_exp" else "wa_exp"
+    st.session_state[f"{other_prefix}_sender_name"] = st.session_state["sender_name"]
+    st.session_state[f"{other_prefix}_company_name"] = st.session_state["company_name"]
+    st.session_state[f"{other_prefix}_website_url"] = st.session_state["website_url"]
+
+
+def get_full_sender() -> str:
+    """Build single source of truth sender string from session state."""
+    name = (st.session_state.get("sender_name") or "Jitendra").strip()
+    company = (st.session_state.get("company_name") or "Appnix Technologies").strip()
+    if name and company:
+        return f"{name}, {company}"
+    return name or company or "Appnix Technologies"
+
+
+def get_website_link() -> str:
+    """Build clean website link from session state."""
+    raw_url = (st.session_state.get("website_url") or "appnix.org").strip()
+    if not raw_url.startswith(("http://", "https://")):
+        return f"https://{raw_url}"
+    return raw_url
+
+
+def render_sender_expander(prefix: str):
+    """Safety net: renders sender details inside an expander at the top of outreach tabs."""
+    with st.expander("👤 Sender Details (Quick Edit)", expanded=False):
+        c1, c2, c3 = st.columns(3)
+        c1.text_input(
+            "Sender Name",
+            key=f"{prefix}_sender_name",
+            on_change=on_expander_sender_change,
+            args=(prefix,),
+        )
+        c2.text_input(
+            "Company Name",
+            key=f"{prefix}_company_name",
+            on_change=on_expander_sender_change,
+            args=(prefix,),
+        )
+        c3.text_input(
+            "Website URL",
+            key=f"{prefix}_website_url",
+            on_change=on_expander_sender_change,
+            args=(prefix,),
+        )
+
 
 # Sidebar: Settings & API Quota
 with st.sidebar:
@@ -124,6 +198,27 @@ with st.sidebar:
         value=900,
         step=50,
         help="Hard stop to avoid accidental billing when approaching Google's monthly free tier limit.",
+    )
+
+    st.markdown("---")
+    st.subheader("Sender Details")
+    st.text_input(
+        "Sender Name",
+        key="sender_name",
+        on_change=on_sidebar_sender_change,
+        help="Your personal or contact name",
+    )
+    st.text_input(
+        "Company Name",
+        key="company_name",
+        on_change=on_sidebar_sender_change,
+        help="Your agency or company name",
+    )
+    st.text_input(
+        "Website URL",
+        key="website_url",
+        on_change=on_sidebar_sender_change,
+        help="Domain included in email signatures",
     )
 
     st.markdown("---")
@@ -153,16 +248,6 @@ with st.sidebar:
             help="Optional Google PageSpeed Insights API key",
             key="input_psi_key",
         )
-
-    st.markdown("---")
-    st.subheader("Outreach Identity")
-    sender_input = st.text_input(
-        "Sender Name / Organization",
-        value=st.session_state["sender_name"],
-        help="Used in template signatures as {sender}",
-    )
-    if sender_input:
-        st.session_state["sender_name"] = sender_input.strip()
 
 
 # Render main app header
@@ -410,6 +495,9 @@ with tab_audit:
 with tab_whatsapp:
     st.subheader("3. WhatsApp Outreach Generator")
 
+    # Safety Net: Sender details quick edit expander for mobile / collapsed sidebar
+    render_sender_expander("wa_exp")
+
     if df.empty:
         st.info("No leads yet. Search a business type and area to begin.")
     else:
@@ -485,13 +573,13 @@ with tab_whatsapp:
             )
 
         benefit_text = api_benefit(lead_row.get("category", ""), language=selected_lang)
-        sender_name = st.session_state.get("sender_name", "Jitendra, Appnix Technologies")
+        full_sender = get_full_sender()
 
         raw_template = TEMPLATES[selected_lang][selected_template]
         initial_message = format_message(
             raw_template,
             name=lead_row["name"],
-            sender=sender_name,
+            sender=full_sender,
             problem=problem_text,
             benefit=benefit_text,
         )
@@ -501,7 +589,7 @@ with tab_whatsapp:
             "Message Content",
             value=initial_message,
             height=200,
-            key=f"msg_area_{lead_row['place_id']}_{selected_template}_{selected_lang}",
+            key=f"msg_area_{lead_row['place_id']}_{selected_template}_{selected_lang}_{full_sender}",
         )
 
         # Live character and word count
@@ -544,6 +632,9 @@ with tab_whatsapp:
 # -------------------- TAB 4: EMAIL OUTREACH --------------------
 with tab_email:
     st.subheader("4. Email Outreach Generator")
+
+    # Safety Net: Sender details quick edit expander for mobile / collapsed sidebar
+    render_sender_expander("email_exp")
 
     st.warning(
         "⚠️ Best Practice: Send manually from your verified business domain, keep volume to 20-30 emails/day max, "
@@ -614,17 +705,19 @@ with tab_email:
             )
 
         benefit_text = api_benefit(lead_row.get("category", ""), language=selected_email_lang)
-        sender_name = st.session_state.get("sender_name", "Jitendra, Appnix Technologies")
+        full_sender = get_full_sender()
+        website_link = get_website_link()
 
         initial_sub, initial_body = format_email(
             language=selected_email_lang,
             template_name=selected_email_tpl,
             name=lead_row["name"],
-            sender=sender_name,
+            sender=full_sender,
             site=lead_row.get("website", ""),
             problem=problem_text,
             benefit=benefit_text,
             psi_score=lead_row.get("psi_mobile", ""),
+            website_url=website_link,
         )
 
         st.caption("Note: This email is a tailored starting point. Review and personalize the details before sending.")
@@ -632,14 +725,14 @@ with tab_email:
         subject_val = st.text_input(
             "Subject Line",
             value=initial_sub,
-            key=f"email_sub_{lead_row['place_id']}_{selected_email_tpl}_{selected_email_lang}",
+            key=f"email_sub_{lead_row['place_id']}_{selected_email_tpl}_{selected_email_lang}_{full_sender}",
         )
 
         body_val = st.text_area(
             "Email Body",
             value=initial_body,
             height=260,
-            key=f"email_body_{lead_row['place_id']}_{selected_email_tpl}_{selected_email_lang}",
+            key=f"email_body_{lead_row['place_id']}_{selected_email_tpl}_{selected_email_lang}_{full_sender}_{website_link}",
         )
 
         # Word count calculation (target 80-120 words)

@@ -7,10 +7,9 @@ import streamlit as st
 
 CUSTOM_CSS = """
 <style>
-    /* Hide Streamlit default hamburger menu and footer */
+    /* Hide Streamlit default hamburger menu and footer only */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
 
     /* Main container spacing */
     .block-container {

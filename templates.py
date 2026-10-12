@@ -79,7 +79,7 @@ TEMPLATES: Dict[str, Dict[str, str]] = {
     },
 }
 
-# Email Templates (Plain-text, 80-120 words, soft question, opt-out line, Appnix Technologies signature)
+# Email Templates (Plain-text, 80-120 words, soft question, opt-out line, dynamic sender and website)
 EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
     "English": {
         "No website": {
@@ -96,8 +96,7 @@ EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "If this isn't relevant, just let me know and I won't write again.\n\n"
                 "Best regards,\n"
                 "{sender}\n"
-                "Appnix Technologies\n"
-                "https://appnix.org"
+                "{website}"
             ),
         },
         "Website audit findings": {
@@ -114,8 +113,7 @@ EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "If this isn't relevant, just let me know and I won't write again.\n\n"
                 "Best regards,\n"
                 "{sender}\n"
-                "Appnix Technologies\n"
-                "https://appnix.org"
+                "{website}"
             ),
         },
         "WhatsApp API": {
@@ -133,8 +131,7 @@ EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "If this isn't relevant, just let me know and I won't write again.\n\n"
                 "Best regards,\n"
                 "{sender}\n"
-                "Appnix Technologies\n"
-                "https://appnix.org"
+                "{website}"
             ),
         },
         "Follow-up (after 3 days)": {
@@ -149,8 +146,7 @@ EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "If this isn't relevant, just let me know and I won't write again.\n\n"
                 "Best regards,\n"
                 "{sender}\n"
-                "Appnix Technologies\n"
-                "https://appnix.org"
+                "{website}"
             ),
         },
         "Final nudge (after 7 days)": {
@@ -165,8 +161,7 @@ EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "If this isn't relevant, just let me know and I won't write again.\n\n"
                 "Best regards,\n"
                 "{sender}\n"
-                "Appnix Technologies\n"
-                "https://appnix.org"
+                "{website}"
             ),
         },
     },
@@ -185,8 +180,7 @@ EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "Agar yeh relevant nahi hai, toh bas bata dijiye aur main dobara contact nahi karunga.\n\n"
                 "Best regards,\n"
                 "{sender}\n"
-                "Appnix Technologies\n"
-                "https://appnix.org"
+                "{website}"
             ),
         },
         "Website audit findings": {
@@ -202,8 +196,7 @@ EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "Agar yeh relevant nahi hai, toh bas bata dijiye aur main dobara contact nahi karunga.\n\n"
                 "Best regards,\n"
                 "{sender}\n"
-                "Appnix Technologies\n"
-                "https://appnix.org"
+                "{website}"
             ),
         },
         "WhatsApp API": {
@@ -219,8 +212,7 @@ EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "Agar yeh relevant nahi hai, toh bas bata dijiye aur main dobara contact nahi karunga.\n\n"
                 "Best regards,\n"
                 "{sender}\n"
-                "Appnix Technologies\n"
-                "https://appnix.org"
+                "{website}"
             ),
         },
         "Follow-up (after 3 days)": {
@@ -235,8 +227,7 @@ EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "Agar yeh relevant nahi hai, toh bas bata dijiye aur main dobara contact nahi karunga.\n\n"
                 "Best regards,\n"
                 "{sender}\n"
-                "Appnix Technologies\n"
-                "https://appnix.org"
+                "{website}"
             ),
         },
         "Final nudge (after 7 days)": {
@@ -251,8 +242,7 @@ EMAIL_TEMPLATES: Dict[str, Dict[str, Dict[str, str]]] = {
                 "Agar yeh relevant nahi hai, toh bas bata dijiye aur main dobara contact nahi karunga.\n\n"
                 "Best regards,\n"
                 "{sender}\n"
-                "Appnix Technologies\n"
-                "https://appnix.org"
+                "{website}"
             ),
         },
     },
@@ -311,7 +301,7 @@ def format_message(
 ) -> str:
     """Format WhatsApp outreach template string safely without missing key errors."""
     clean_name = (name or "there").strip()
-    clean_sender = (sender or "Appnix Technologies").strip()
+    clean_sender = (sender or "Jitendra, Appnix Technologies").strip()
     clean_problem = (problem or "").strip()
     clean_benefit = (benefit or "").strip()
 
@@ -332,6 +322,7 @@ def format_email(
     problem: str = "",
     benefit: str = "",
     psi_score: Any = "",
+    website_url: str = "appnix.org",
 ) -> Tuple[str, str]:
     """
     Format subject and body for an email template.
@@ -350,6 +341,9 @@ def format_email(
     clean_problem = (problem or "").strip()
     clean_benefit = (benefit or "").strip()
 
+    raw_url = (website_url or "appnix.org").strip()
+    clean_website = raw_url if raw_url.startswith(("http://", "https://")) else f"https://{raw_url}"
+
     # Graceful degradation for psi_score
     psi_str = str(psi_score).strip() if psi_score is not None else ""
     if psi_str and psi_str.isdigit():
@@ -366,6 +360,7 @@ def format_email(
         site=clean_site,
         problem=clean_problem,
         benefit=clean_benefit,
+        website=clean_website,
     )
 
     formatted_body = raw_body.format(
@@ -375,6 +370,7 @@ def format_email(
         problem=clean_problem,
         benefit=clean_benefit,
         psi_line=psi_line,
+        website=clean_website,
     )
 
     return formatted_subject, formatted_body
